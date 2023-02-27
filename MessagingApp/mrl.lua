@@ -74,8 +74,14 @@ function unknownEvent()
 end
 
 local function displaySettings()
-  gpu.set(3,5, "Current Port: " ..port)
-  gpu.set(3,7, "Notifiction Sound: " ..tostring(notificationSnd))
+ gpu.setForeground(0x101010)
+ gpu.setBackground(0xFFB000)
+ gpu.set(3,5, "C")
+ gpu.set(3,7, "N")
+ gpu.setBackground(0x101010)
+ gpu.setForeground(0xFFB000)
+ gpu.set(4,5, "urrent Port: " ..port)
+ gpu.set(4,7, "otifiction Sound: " ..tostring(notificationSnd))
 end
 
 -- table that holds all event handlers
