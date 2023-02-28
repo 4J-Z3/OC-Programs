@@ -9,17 +9,21 @@ local keyboard = comp.keyboard
 local port = 25565
 local notificationSnd = false
 
-local running = true
+local backGroundColor = 0x101010
+local foreGroundColor = 0xFFB000
+
+local running = false
 
 local w, h = gpu.getResolution()
 
-local programName = "BoxARocks_'s Messaging Program V0.2.2623"
+local programName = "BoxARocks_'s Messaging Program V0.3.2623"
 
-gpu.setBackground(0x101010)
-gpu.setForeground(0xFFB000)
+gpu.setBackground(backGroundColor)
+gpu.setForeground(foreGroundColor)
 
-local function TextCenter(Text)
- return math.floor( (w/2) - (string.len(Text) / 2) )
+--centers text on the screen
+local function TextCenter(Text, axis)
+ return math.floor( (axis/2) - (string.len(Text) / 2) )
  end
 
 --this function will clear the screen and put the program name uptop
@@ -30,7 +34,7 @@ local function clearScreen(addTitle)
  end
  if addTitle then
   gpu.fill( 1,1, w,1, "=")
-  gpu.set( TextCenter(programName), 1, programName )
+  gpu.set( TextCenter(programName, w), 1, programName )
  end
 end
 
@@ -69,19 +73,28 @@ local function drawBox(x, y, width, height)
  gpu.fill(x + width - 1, y + 1, 1, height - 2, unicode.char(9475)) -- right
 end
 
-function unknownEvent()
-  -- do nothing if the event wasn't relevant
+--this functions highlights the word supplied and places is at the x y coords
+local function highlightText(x, y, word, Highlight)
+ gpu.set(x,y,word)
+ for i = 1, #word do
+  local c = word:sub(i,i)
+  if c == Highlight then
+   gpu.setForeground(0xFFFFFF)
+   gpu.set(x + (i - 1), y, Highlight)
+   gpu.setForeground(foreGroundColor)
+  end
+ end
 end
 
-local function displaySettings()
- gpu.setForeground(0x101010)
- gpu.setBackground(0xFFB000)
- gpu.set(3,5, "C")
- gpu.set(3,7, "N")
- gpu.setBackground(0x101010)
- gpu.setForeground(0xFFB000)
- gpu.set(4,5, "urrent Port: " ..port)
- gpu.set(4,7, "otifiction Sound: " ..tostring(notificationSnd))
+--this functions creates a dialouge popup based on the specified parameters
+local function makePopup(x, y, width, height, title)
+  gpu.fill(x,y ,string.len(title) + 2 + width, height, " ")
+  drawBox(x ,y, string.len(title) + 2 + width, height)
+  gpu.set(x + 1 + (width/2), y, title)
+end
+
+function unknownEvent()
+  -- do nothing if the event wasn't relevant
 end
 
 -- table that holds all event handlers
@@ -103,110 +116,249 @@ computer.beep(800)
 
 os.sleep(1)
 
-gpu.set( TextCenter("Initializing"), 4, "Initializing")
+gpu.set( TextCenter("Initializing", w), 4, "Initializing")
 
-loadingBar( TextCenter("Initializing") - 6,5,24,1)
+loadingBar( TextCenter("Initializing", w) - 6,5,24,1)
 
 computer.beep(800)
 
 os.sleep(1)
 
- gpu.set( TextCenter("Term Availability"), 7,  "Term Availability")
+ gpu.set( TextCenter("Term Availability", w), 7,  "Term Availability")
  --loops 4 times printing ....
 for i = 0, 3 do
- gpu.set( TextCenter("Term Availability") + string.len("Term Availability") + i, 7, ".")
+ gpu.set( TextCenter("Term Availability", w) + string.len("Term Availability") + i, 7, ".")
  os.sleep(0.3)
 end
 
 computer.beep(800)
 
-gpu.set( TextCenter("Checking Port"), 9, "Checking Port" )
+gpu.set( TextCenter("Checking Port", w), 9, "Checking Port" )
  --loops 4 times printing ....
- for i = 0, 3 do
- gpu.set( TextCenter("Checking Port") + string.len("Checking Port") + i, 9, ".")
+for i = 0, 3 do
+ gpu.set( TextCenter("Checking Port", w) + string.len("Checking Port") + i, 9, ".")
  os.sleep(0.6)
 end
-if modem.isOpen(port) == true  then
+
+--checks if the port is open if it is then it continues
+if modem.isOpen(port) then
  os.sleep(0.6)
  computer.beep(800)
- gpu.set( TextCenter("Port Open On: " ..port), 11, "Port Open: " ..port)
+ gpu.set(TextCenter("Port Open: " ..port, w), 11, "Port Open: " ..port)
 else
---100 lines milestone
-os.sleep(0.6)
+ os.sleep(0.6)
  computer.beep(800)
- gpu.set( TextCenter("No Port Open"), 11, "No Port Open")
+ gpu.set( TextCenter("No Port Open", w), 11, "No Port Open")
+ os.sleep(2)
+
+ ::OpenPort::
+ computer.beep(800)
+ gpu.set( TextCenter("Do you want to open a port on: " .. port .. "?", w), 11, "Do you want to open a port on: " .. port .. "?")
+ gpu.set( TextCenter("[Y/N]: ", w), 12, "[Y/N]: ")
+ term.setCursor( TextCenter("[Y/N]: ", w) + 8, 12)
+
+ if ((io.stdin:read() or "n") .. "y"):match("^%s*[Yy]") then
+   ::OpenPortRetry::
+   if modem.open(port) then
+    gpu.fill(TextCenter("Do you want to open a port on: " .. port .. "?", w), 11, string.len("Do you want to open a port on: " .. port .. "?") , 2, " ")
+    gpu.set( TextCenter("Success!", w), 11, "Success!")
+    os.sleep(1)
+   else
+    gpu.fill(TextCenter("Do you want to open a port on: " .. port .. "?", w), 11, string.len("Do you want to open a port on: " .. port .. "?") , 2, " ")
+    gpu.set( TextCenter("Error cannot open port on: " ..port, w), 11, "Error cannot open port on: " ..port)
+    gpu.set( TextCenter("Retry? [Y/N]: ", w), 12, "Retry? [Y/N]: ", w)
+    term.setCursor( TextCenter("Retry? [Y/N]: ", w) + 14, 12)
+    if ((io.stdin:read() or "n") .. "y"):match("^%s*[Yy]") then
+     goto OpenPortRetry
+    elseif ((io.stdin:read() or "y") .. "n"):match("^%s*[Nn]") then
+     --if the users inputs no then we dont do nothin'
+    end
+   end
+
+  elseif ((io.stdin:read() or "y") .. "n"):match("^%s*[Nn]") then
+  --if the users inputs no then we dont do nothin'
+ end
 end
-os.sleep(0.5)
+
+os.sleep(1)
 clearScreen(true)
 
+running = true
+
+--Displays settings menu
+local function displaySettings()
+ gpu.fill(3,4, w - 4, h - 5, " ")
+ drawBox(2,3,w - 2,h - 3)
+ --Change able variables
+ highlightText(4,5, "Current port: " ..port, "C")
+ highlightText(4,7, "Notification Sound: " ..tostring(notificationSnd), "N")
+ if modem.isOpen(port) then
+  highlightText(4,9, "Close port", "p")
+ else
+  gpu.set(4,9, "Open ")
+  highlightText(9,9, "port", "p")
+ end
+ --info
+ gpu.set(w - string.len("Port Status...") - 8,5, "Port Status... " ..tostring(modem.isOpen(port)))
+end
+
+--Displays help menu
+local function displayHelp(category)
+  gpu.fill(3,4, w - 4, h - 5, " ")
+  drawBox(2,3,w - 2,h - 3)
+  if category == 0 then
+    gpu.set(TextCenter("Welcome to " .. programName, w),5, "Welcome to " .. programName)
+    gpu.set(TextCenter("This is the user help screen.", w), 6, "This is the user help screen.")
+    gpu.set(4, 8, "This page is where you can find help on certain functions of this program.")
+    highlightText(4, 10, "[Controls]", "C")
+    highlightText(4, 11, "[Functions]", "F")
+  elseif category == 1 then
+    gpu.set(TextCenter("[Controls]", w),5, "[Controls]")
+  elseif category == 2 then
+    gpu.set(TextCenter("[Functions]", w),5, "[Functions]")
+  end
+end
+
+local function drawMenu(enabled)
+ if enabled then
+  highlightText(5, 2, "Quit", "Q")
+  highlightText(string.len("Quit") + 10, 2, "Settings", "S")
+  highlightText(string.len("Quit") + string.len("Settings") + 15, 2, "Info", "I")
+ else
+  gpu.set(5, 2, "Quit")
+  gpu.set(string.len("Quit") + 10, 2, "Settings")
+  gpu.set(string.len("Quit") + string.len("Settings") + 15, 2, "Info")
+ end
+end
+
+--displays chat
+local function displayChat()
+  gpu.fill(3,4, w - 4, h - 5, " ")
+  drawBox(2,3,w - 2,h - 3)
+  gpu.set(3, h - 2, ">> ")
+  term.setCursor(6, h - 2)
+end
 
 --This is the main
 
 computer.beep(800)
 
-gpu.set(5, 2, "Quit")
-gpu.set(string.len("Quit") + 10, 2, "Settings")
-gpu.set(string.len("Quit") + string.len("Settings") + 15, 2, "Info")
+drawMenu(false)
 
 --draw the text box
 drawBox(2,3,w - 2,h - 3)
 
---important variables that i am too lazy to move up top
-local tabbed = false 
+--important variables that i am too lazy to move up top and for ease of access
+local altMenu = false 
 local chatting = true
 local settingsOpen = false
 local infoOpen = false
+--local dialougeOpen = false
+
+--this function will clear any variables set to true besides some
+local function clearOpenedMenus()
+  settingsOpen = false
+  infoOpen = false
+end
 
 function myEventHandlers.key_up(address, char, code, playerName)
-  if char == string.byte(unicode.char(9)) then
-   gpu.set(3,4,"Tab")
-   if tabbed then
-    tabbed = false
-    chatting = true
+  --io.stdout:write("Char: " .. char, "Code: " .. code) --for testing purposes
 
-    gpu.set(5, 2, "Quit")
-    gpu.set(string.len("Quit") + 10, 2, "Settings")
-    gpu.set(string.len("Quit") + string.len("Settings") + 15, 2, "Info")
-
-   else
-    tabbed = true
-    chatting = false
+  if (code == tonumber(0x38)) or (code == tonumber(0xB8)) then --Alt Menu
     
-    gpu.setForeground(0x101010)
-    gpu.setBackground(0xFFB000)
-    gpu.set(5, 2, "Q")
-    gpu.set(string.len("Quit") + 10, 2, "S")
-    gpu.set(string.len("Quit") + string.len("Settings") + 15, 2, "I")
-    gpu.setBackground(0x101010)
-    gpu.setForeground(0xFFB000)
-    gpu.set(6, 2, "uit")
-    gpu.set(string.len("Quit") + 11, 2, "ettings")
-    gpu.set(string.len("Quit") + string.len("Settings") + 16, 2, "nfo")
-
+   if altMenu then
+    altMenu = false
+    chatting = true
+    drawMenu(false)
+   else
+    altMenu = true
+    chatting = false
+    drawMenu(true)
    end
-  elseif(char == string.byte("q")) or (char == string.byte("Q")) then
-    if tabbed then
-      clearScreen(true)
-      gpu.set( TextCenter("Goodbye!"), math.floor( (h/2) - (string.len("Goodbye!") / 2) ), "Goodbye!")
-      os.sleep(1)
-      running = false
-      tabbed = false
-      clearScreen(false)
-    end 
-  elseif(char == string.byte("s")) or (char == string.byte("S")) then
-    if tabbed then
-      if infoOpen == false then
-        if settingsOpen then
-          settingsOpen = false
-          gpu.fill( 1,1, w,1, "=")
-         gpu.set( TextCenter(programName), 1, programName )
-         gpu.fill(3,4, w - 4,h - 5, " ")
-         else
-         gpu.fill( 1,1, w,1, "=")
-         gpu.set( TextCenter("Settings"), 1, "Settings" )
-         settingsOpen = true
-         displaySettings()
+ 
+  elseif (char == string.byte("Q")) or (char == string.byte("q")) then --Quit
+    if altMenu then
+     running = false
+     clearScreen(true)
+
+     if modem.isOpen(port) then
+      gpu.set(TextCenter("Do you want to close " .. port .. "?", w), TextCenter("Goodbye!", h) - 2, "Do you want to close " .. port .. "?")
+      gpu.set(TextCenter("[Y/N]: ", w), TextCenter("Goodbye!", h) - 1, "[Y/N]: ")
+      term.setCursor(TextCenter("[Y/N]: ", w) + 8, TextCenter("Goodbye!", h) - 1)
+      if ((io.stdin:read() or "n") .. "y"):match("^%s*[Yy]") then
+       modem.close(port)
+      end
+     end
+
+     clearScreen(true)
+
+     gpu.set(TextCenter("Goodbye!", w), TextCenter("Goodbye!", h), "Goodbye!")
+     os.sleep(2)
+     clearScreen(false)
+     term.setCursor(1,1)
+     os.exit()
+    end
+  elseif (char == string.byte("S")) or (char == string.byte("s")) then --Settings
+    if altMenu then
+     clearOpenedMenus()
+     settingsOpen = true
+     altMenu = false
+     drawMenu(false)
+     displaySettings()
+    end
+  elseif (char == string.byte("I")) or (char == string.byte("i")) then
+    if altMenu then
+     clearOpenedMenus()
+     infoOpen = true
+     altMenu = false
+     drawMenu(false)
+     displayHelp(0)
+    end
+  elseif (code == tonumber(0x0F)) then --exit current screen
+    if altMenu then
+      altMenu = false
+      chatting = true
+      drawMenu(false)
+      displayChat()
+    elseif settingsOpen then
+      chatting = true
+      settingsOpen = false
+      displayChat()
+    elseif infoOpen then
+      chatting = true
+      infoOpen = false
+      displayChat()
+    end
+  elseif (char == string.byte("C")) then
+    if settingsOpen then
+      makePopup(TextCenter("Change Port", w) - 2, h/2 - 1, 4, 3, "Change Port")
+      term.setCursor(TextCenter("Change Port", w) + 4, h/2)
+      local newPort = io.stdin:read()
+      local oldPort = port
+      if tonumber(newPort) ~= nil then
+        newPort = tonumber(newPort)
+       if newPort <= 65535 then
+        if modem.isOpen(oldPort) then
+          modem.close(oldPort)
+          modem.open(newPort)
+          port = newPort
+        else
+          port = newPort
         end
+       end
+      end
+      displaySettings()
+    elseif infoOpen then
+      displayHelp(1)
+    end
+  elseif (char == string.byte("p")) then
+    if settingsOpen then
+      if modem.isOpen(port) then
+      modem.close(port)
+      displaySettings()
+      else
+      modem.open(port)
+      displaySettings()
       end
     end
   end
@@ -214,4 +366,5 @@ end
 
 while running do
   handleEvent(event.pull())
+  os.sleep()
 end

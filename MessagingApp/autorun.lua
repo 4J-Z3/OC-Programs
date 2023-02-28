@@ -1,0 +1,3 @@
+local fs = require("filesystem")
+local proxy = ...
+fs.mount( proxy, "/2c5")
