@@ -3,23 +3,32 @@ local computer = require("computer")
 local term = require("term")
 local event = require("event")
 local unicode = require("unicode")
+local thread = require("thread")
+
 local gpu = comp.gpu
 local modem = comp.modem
 local keyboard = comp.keyboard
+
 local port = 25565
+local user = ""
+local message = ""
+local programName = "BoxARocks_'s Messaging Program V0.3.2623"
 local notificationSnd = false
+local running = false
 
 local backGroundColor = 0x101010
 local foreGroundColor = 0xFFB000
 
-local running = false
-
 local w, h = gpu.getResolution()
-
-local programName = "BoxARocks_'s Messaging Program V0.3.2623"
 
 gpu.setBackground(backGroundColor)
 gpu.setForeground(foreGroundColor)
+
+--[[
+
+you should make another lua file and put some of these graphical funstions in their and call it an api it would cleans this file up a lot and look neat and clean
+
+]]
 
 --centers text on the screen
 local function TextCenter(Text, axis)
@@ -28,10 +37,7 @@ local function TextCenter(Text, axis)
 
 --this function will clear the screen and put the program name uptop
 local function clearScreen(addTitle)
- for i = 0, h do
-  gpu.fill( 1,1, w,i, " ")
-  os.sleep()
- end
+  gpu.fill( 1,1, w,h, " ")
  if addTitle then
   gpu.fill( 1,1, w,1, "=")
   gpu.set( TextCenter(programName, w), 1, programName )
@@ -154,8 +160,8 @@ else
  ::OpenPort::
  computer.beep(800)
  gpu.set( TextCenter("Do you want to open a port on: " .. port .. "?", w), 11, "Do you want to open a port on: " .. port .. "?")
- gpu.set( TextCenter("[Y/N]: ", w), 12, "[Y/N]: ")
- term.setCursor( TextCenter("[Y/N]: ", w) + 8, 12)
+ gpu.set( TextCenter("[Y/N]>", w), 12, "[Y/N]>")
+ term.setCursor( TextCenter("[Y/N]>", w) + 6, 12)
 
  if ((io.stdin:read() or "n") .. "y"):match("^%s*[Yy]") then
    ::OpenPortRetry::
@@ -166,17 +172,7 @@ else
    else
     gpu.fill(TextCenter("Do you want to open a port on: " .. port .. "?", w), 11, string.len("Do you want to open a port on: " .. port .. "?") , 2, " ")
     gpu.set( TextCenter("Error cannot open port on: " ..port, w), 11, "Error cannot open port on: " ..port)
-    gpu.set( TextCenter("Retry? [Y/N]: ", w), 12, "Retry? [Y/N]: ", w)
-    term.setCursor( TextCenter("Retry? [Y/N]: ", w) + 14, 12)
-    if ((io.stdin:read() or "n") .. "y"):match("^%s*[Yy]") then
-     goto OpenPortRetry
-    elseif ((io.stdin:read() or "y") .. "n"):match("^%s*[Nn]") then
-     --if the users inputs no then we dont do nothin'
-    end
    end
-
-  elseif ((io.stdin:read() or "y") .. "n"):match("^%s*[Nn]") then
-  --if the users inputs no then we dont do nothin'
  end
 end
 
@@ -236,7 +232,8 @@ local function displayChat()
   gpu.fill(3,4, w - 4, h - 5, " ")
   drawBox(2,3,w - 2,h - 3)
   gpu.set(3, h - 2, ">> ")
-  term.setCursor(6, h - 2)
+  gpu.fill(6, h-2, w - 8, 1, " ")
+  gpu.set(6, h - 2, message)
 end
 
 --This is the main
@@ -247,10 +244,11 @@ drawMenu(false)
 
 --draw the text box
 drawBox(2,3,w - 2,h - 3)
+displayChat()
 
 --important variables that i am too lazy to move up top and for ease of access
 local altMenu = false 
-local chatting = true
+local typing = true
 local settingsOpen = false
 local infoOpen = false
 --local dialougeOpen = false
@@ -261,30 +259,38 @@ local function clearOpenedMenus()
   infoOpen = false
 end
 
-function myEventHandlers.key_up(address, char, code, playerName)
-  --io.stdout:write("Char: " .. char, "Code: " .. code) --for testing purposes
+--[[
 
+so as of right now when you press tab it completely closes everything im gonna need to change it so it goes back a level if you are in a multi-layerd gui
+
+]]
+
+function myEventHandlers.key_up(address, char, code, playerName)
+ --io.stdout:write("Char: " .. char, "Code: " .. code, "\nTest: " .. string.char(char) .. "\n") --for testing purposes
+  
   if (code == tonumber(0x38)) or (code == tonumber(0xB8)) then --Alt Menu
     
    if altMenu then
     altMenu = false
-    chatting = true
+    typing = true
     drawMenu(false)
    else
     altMenu = true
-    chatting = false
+    typing = false
     drawMenu(true)
    end
  
   elseif (char == string.byte("Q")) or (char == string.byte("q")) then --Quit
+   
     if altMenu then
      running = false
+     os.sleep()
      clearScreen(true)
 
      if modem.isOpen(port) then
       gpu.set(TextCenter("Do you want to close " .. port .. "?", w), TextCenter("Goodbye!", h) - 2, "Do you want to close " .. port .. "?")
-      gpu.set(TextCenter("[Y/N]: ", w), TextCenter("Goodbye!", h) - 1, "[Y/N]: ")
-      term.setCursor(TextCenter("[Y/N]: ", w) + 8, TextCenter("Goodbye!", h) - 1)
+      gpu.set(TextCenter("[Y/N]>", w), TextCenter("Goodbye!", h) - 1, "[Y/N]>")
+      term.setCursor(TextCenter("[Y/N]>", w) + 6, TextCenter("Goodbye!", h) - 1)
       if ((io.stdin:read() or "n") .. "y"):match("^%s*[Yy]") then
        modem.close(port)
       end
@@ -298,7 +304,9 @@ function myEventHandlers.key_up(address, char, code, playerName)
      term.setCursor(1,1)
      os.exit()
     end
+
   elseif (char == string.byte("S")) or (char == string.byte("s")) then --Settings
+   
     if altMenu then
      clearOpenedMenus()
      settingsOpen = true
@@ -306,7 +314,9 @@ function myEventHandlers.key_up(address, char, code, playerName)
      drawMenu(false)
      displaySettings()
     end
+
   elseif (char == string.byte("I")) or (char == string.byte("i")) then
+    
     if altMenu then
      clearOpenedMenus()
      infoOpen = true
@@ -314,26 +324,30 @@ function myEventHandlers.key_up(address, char, code, playerName)
      drawMenu(false)
      displayHelp(0)
     end
+
   elseif (code == tonumber(0x0F)) then --exit current screen
+   
     if altMenu then
       altMenu = false
-      chatting = true
+      typing = true
       drawMenu(false)
       displayChat()
     elseif settingsOpen then
-      chatting = true
+      typing = true
       settingsOpen = false
       displayChat()
     elseif infoOpen then
-      chatting = true
+      typing = true
       infoOpen = false
       displayChat()
     end
+
   elseif (char == string.byte("C")) then
+   
     if settingsOpen then
       makePopup(TextCenter("Change Port", w) - 2, h/2 - 1, 4, 3, "Change Port")
       term.setCursor(TextCenter("Change Port", w) + 4, h/2)
-      local newPort = io.stdin:read()
+      local newPort = io.stdin:read(5)
       local oldPort = port
       if tonumber(newPort) ~= nil then
         newPort = tonumber(newPort)
@@ -351,7 +365,9 @@ function myEventHandlers.key_up(address, char, code, playerName)
     elseif infoOpen then
       displayHelp(1)
     end
+
   elseif (char == string.byte("p")) then
+   
     if settingsOpen then
       if modem.isOpen(port) then
       modem.close(port)
@@ -361,10 +377,35 @@ function myEventHandlers.key_up(address, char, code, playerName)
       displaySettings()
       end
     end
+
   end
+
+  if typing then
+    if string.char(char):match("%w") or string.char(char):match("%p") or string.char(char):match(" ") then
+      message = message .. string.char(char)
+      if string.len(message) >= w - 7 then
+        io.stdout:write("cutoff")
+      end
+      gpu.fill(6, h-2, w - 8, 1, " ")
+      gpu.set(6, h - 2, message)
+      --io.stdout:write( "Test: " .. string.char(char) .. "\n")
+      --io.stdout:write( "Test2: " .. string.char(char) .. "\n" )
+    elseif (char == 8) and (string.len(message) ~= 0) then
+      message = message:sub(1, -2)
+      gpu.fill(6, h-2, w - 8, 1, " ")
+      gpu.set(6, h - 2, message)
+    end
+  end
+
 end
+
+thread.create(function() 
+  while running do
+    drawBox(2,3,w - 2,h - 3)
+    os.sleep()
+  end
+end)
 
 while running do
   handleEvent(event.pull())
-  os.sleep()
 end
