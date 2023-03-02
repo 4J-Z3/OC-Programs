@@ -263,6 +263,7 @@ end
 
 so as of right now when you press tab it completely closes everything im gonna need to change it so it goes back a level if you are in a multi-layerd gui
 
+also add in a damn cursor
 ]]
 
 function myEventHandlers.key_up(address, char, code, playerName)

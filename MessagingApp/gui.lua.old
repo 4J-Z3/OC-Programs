@@ -1,0 +1,189 @@
+--this was based off of dustpuppys gui libary
+
+local component = require("component")
+local event = require("event")
+local unicode = require("unicode")
+local gpu = component.gpu
+
+local screenWidth, screenHeight = gpu.getResolution()
+
+local backgroundColor = 0x101010
+local foregroundColor = 0xFFB000
+
+-- Vertical, Horizontal, Top left then right, Bottom left then right
+local borders = {
+  ["Bold"] = {0x2503, 0x2501, 0x250F, 0x2513, 0x2517, 0x251B}
+}
+
+local windowBorder = borders["Bold"]
+
+local guiManager = {}
+
+local guiWindowList = {}
+
+--Just clears the screen
+function clearScreen()
+  gpu.setBackground(backgroundColor)
+  gpu.setForeground(foregroundColor)
+
+  gpu.fill(1,1, screenWidth, screenHeight, " ")
+end
+
+function redrawAllGuis()
+  for i = 1, #guiWindowList do
+    guiWindowList[i]:Draw()
+  end
+end
+
+-- Gui window
+local guiWindow = {}
+
+guiWindow.__index = guiWindow
+
+function guiWindow:New(x, y, width, height, text)
+  local window = setmetatable({
+    x = x,
+    y = y,
+    width = width,
+    height = height,
+    text = text,
+    id = #guiWindowList + 1,
+    buffer = {},
+    windowElements = {},
+    disableButtons = false,
+    hide = false,
+    onCloseRun = nil,
+    refresh = true
+  }, guiWindow)
+  table.insert(guiWindowList, window)
+  return window
+end
+
+--saves the line
+function guiWindow:saveScreen()
+  self.buffer = {}
+  for posX = self.x, self.x + self.width do
+    local ch, fc, bc = gpu.get(posX,self.y) -- gets the current character foreground color and background color
+    table.insert(self.buffer, {ch, fc, bc})
+  end
+  return buffer
+end
+
+--loads the provided buffer/screen
+function guiWindow:loadScreen(screen)
+
+  local oldBg, oldFg
+
+  for key, value in pair(self.buffer) do
+    if value[3] ~= oldBg then
+      gpu.setBackGround(value[3])
+      oldBg = value[3]
+    end
+
+    if value[2] ~= oldFg then
+      gpu.setForeGround(value[2])
+      oldFg = value[2]
+    end
+
+    gpu.set(self.x + key - 1, self.y, value[3])
+  end
+end
+
+function guiWindow:Draw()
+  self:saveScreen()
+
+  gpu.fill(self.x, self.y, self.width, 1, " ")
+
+  gpu.fill(self.x, self.y, self.width, self.height, " ")
+
+  --corners
+  gpu.set(self.x, self.y, unicode.char(windowBorder[3]))
+  gpu.set(self.x, self.y + self.height - 1, unicode.char(windowBorder[5]))
+  gpu.set(self.x + self.width - 1, self.y, unicode.char(windowBorder[4]))
+  gpu.set(self.x + self.width -1, self.y + self.height - 1, unicode.char(windowBorder[6]))
+
+  --edges
+  gpu.fill(self.x + 1, self.y, self.width - 2, 1, unicode.char(windowBorder[2])) --Top
+  gpu.fill(self.x, self.y + 1, 1, self.height - 2, unicode.char(windowBorder[1])) --Left
+  gpu.fill(self.x + 1, self.y + self.height - 1, self.width - 2, 1, unicode.char(windowBorder[2])) --Bottom
+  gpu.fill(self.x + self.width - 1, self.y + 1, 1, self.height - 2, unicode.char(windowBorder[1])) --Right
+
+  if #self.text ~= 0 then
+    if string.len(self.text) <= self.width - 4 then
+      gpu.set(self.x + math.floor(self.width/2) - math.floor(string.len(" " .. self.text .. " ")/2), self.y, " " .. self.text .. " " )
+    else
+      gpu.set(self.x + 1, self.y, string.sub(self.text, 1, self.width - 4) .. "~")
+    end
+  end
+
+
+  for i = 1, #self.windowElements do
+    self.windowElements[i].drawCallback(self, self.windowElements)
+  end
+end
+
+--Gui element
+
+local elements = {}
+
+elements.__index = elements
+
+function elements:New(id, x, y, width, height, text, callback)
+  local element = setmetatable({
+    id = id or "unknown",
+    x = x,
+    y = y,
+    width = width,
+    height = height,
+    text = text,
+    alignment = "center",
+    wordWrap = false,
+    callback = callback or nil,
+    drawCallback = nil,
+    handleCallback = nil,
+    background = nil,
+    foreground = nil,
+    activeBackground = nil,
+    activeForeground = nil,
+    isActive = false,
+    min = 0,
+    max = 0,
+    value = 0,
+    --steps = 0,
+    state = false,
+    data = {},
+    selected = 1,
+    type = 1
+  }, elements)
+  return element
+end
+
+--Gui manager stuff
+
+function guiManager.newWindow(x, y, width, height, text)
+  return guiWindow:New(x, y, width, height, text)
+end
+
+function guiManager.drawGui(self)
+  table.remove(guiWindowList, self.id)
+  table.insert(guiWindowList, self)
+  clearScreen()
+  redrawAllGuis()
+end
+
+function guiManager.drawGui(self)
+  clearScreen()
+  self:Draw()
+end
+
+function guiManager.closeGui(self)
+  table.remove(guiWindowList, self.id)
+  clearScreen()
+  redrawAllGuis()
+end
+
+function guiManager.newElement(id, x, y, width, height, text, callback)
+  return elements:New(id, x, y, width, height, text, callback)
+end
+
+return guiManager
